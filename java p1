@@ -1,0 +1,43 @@
+import java.io.*;
+
+class Student implements Serializable {
+    private static final long serialVersionUID = 1L;
+    private int studentID;
+    private String name;
+    private String grade;
+
+    public Student(int studentID, String name, String grade) {
+        this.studentID = studentID;
+        this.name = name;
+        this.grade = grade;
+    }
+
+    @Override
+    public String toString() {
+        return "Student ID: " + studentID + ", Name: " + name + ", Grade: " + grade;
+    }
+}
+
+public class StudentSerializationDemo {
+    public static void main(String[] args) {
+        Student student = new Student(101, "Alice", "A");
+        String filename = "student.ser";
+
+        try (FileOutputStream fos = new FileOutputStream(filename);
+             ObjectOutputStream oos = new ObjectOutputStream(fos)) {
+            oos.writeObject(student);
+            System.out.println("Student object has been serialized to " + filename);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        try (FileInputStream fis = new FileInputStream(filename);
+             ObjectInputStream ois = new ObjectInputStream(fis)) {
+            Student deserializedStudent = (Student) ois.readObject();
+            System.out.println("Student object has been deserialized.");
+            System.out.println("Deserialized Student Data: " + deserializedStudent);
+        } catch (IOException | ClassNotFoundException e) {
+            e.printStackTrace();
+        }
+    }
+}
