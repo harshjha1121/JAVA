@@ -1,0 +1,148 @@
+import java.sql.*;
+import java.util.*;
+
+public class StudentManagementMVC {
+
+    // Model
+    static class Student {
+        private int studentID;
+        private String name;
+        private String department;
+        private double marks;
+
+        public Student(int studentID, String name, String department, double marks) {
+            this.studentID = studentID;
+            this.name = name;
+            this.department = department;
+            this.marks = marks;
+        }
+
+        public int getStudentID() { return studentID; }
+        public String getName() { return name; }
+        public String getDepartment() { return department; }
+        public double getMarks() { return marks; }
+    }
+
+    // Controller
+    static class StudentController {
+        private static final String URL = "jdbc:mysql://localhost:3306/your_database_name";
+        private static final String USER = "your_username";
+        private static final String PASSWORD = "your_password";
+
+        static {
+            try { Class.forName("com.mysql.cj.jdbc.Driver"); }
+            catch (ClassNotFoundException e) { e.printStackTrace(); }
+        }
+
+        private Connection getConnection() throws SQLException {
+            return DriverManager.getConnection(URL, USER, PASSWORD);
+        }
+
+        public boolean addStudent(Student s) {
+            String query = "INSERT INTO Student (Name, Department, Marks) VALUES (?, ?, ?)";
+            try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(query)) {
+                ps.setString(1, s.getName());
+                ps.setString(2, s.getDepartment());
+                ps.setDouble(3, s.getMarks());
+                return ps.executeUpdate() > 0;
+            } catch (SQLException e) { e.printStackTrace(); return false; }
+        }
+
+        public List<Student> getAllStudents() {
+            List<Student> list = new ArrayList<>();
+            String query = "SELECT * FROM Student";
+            try (Connection conn = getConnection(); Statement stmt = conn.createStatement(); ResultSet rs = stmt.executeQuery(query)) {
+                while (rs.next()) {
+                    list.add(new Student(
+                        rs.getInt("StudentID"),
+                        rs.getString("Name"),
+                        rs.getString("Department"),
+                        rs.getDouble("Marks")
+                    ));
+                }
+            } catch (SQLException e) { e.printStackTrace(); }
+            return list;
+        }
+
+        public boolean updateStudent(Student s) {
+            String query = "UPDATE Student SET Name=?, Department=?, Marks=? WHERE StudentID=?";
+            try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(query)) {
+                ps.setString(1, s.getName());
+                ps.setString(2, s.getDepartment());
+                ps.setDouble(3, s.getMarks());
+                ps.setInt(4, s.getStudentID());
+                return ps.executeUpdate() > 0;
+            } catch (SQLException e) { e.printStackTrace(); return false; }
+        }
+
+        public boolean deleteStudent(int id) {
+            String query = "DELETE FROM Student WHERE StudentID=?";
+            try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(query)) {
+                ps.setInt(1, id);
+                return ps.executeUpdate() > 0;
+            } catch (SQLException e) { e.printStackTrace(); return false; }
+        }
+    }
+
+    // View
+    public static void main(String[] args) {
+        Scanner sc = new Scanner(System.in);
+        StudentController controller = new StudentController();
+
+        while (true) {
+            System.out.println("\n--- Student Management ---");
+            System.out.println("1. Add Student");
+            System.out.println("2. View All Students");
+            System.out.println("3. Update Student");
+            System.out.println("4. Delete Student");
+            System.out.println("5. Exit");
+            System.out.print("Enter choice: ");
+            int choice = sc.nextInt();
+            sc.nextLine();
+
+            switch (choice) {
+                case 1:
+                    System.out.print("Name: "); String name = sc.nextLine();
+                    System.out.print("Department: "); String dept = sc.nextLine();
+                    System.out.print("Marks: "); double marks = sc.nextDouble();
+                    if (controller.addStudent(new Student(0, name, dept, marks)))
+                        System.out.println("Student added successfully.");
+                    else
+                        System.out.println("Failed to add student.");
+                    break;
+
+                case 2:
+                    List<Student> students = controller.getAllStudents();
+                    System.out.println("ID | Name | Department | Marks");
+                    for (Student s : students)
+                        System.out.println(s.getStudentID()+" | "+s.getName()+" | "+s.getDepartment()+" | "+s.getMarks());
+                    break;
+
+                case 3:
+                    System.out.print("StudentID to update: "); int updateId = sc.nextInt(); sc.nextLine();
+                    System.out.print("New Name: "); String newName = sc.nextLine();
+                    System.out.print("New Department: "); String newDept = sc.nextLine();
+                    System.out.print("New Marks: "); double newMarks = sc.nextDouble();
+                    if (controller.updateStudent(new Student(updateId, newName, newDept, newMarks)))
+                        System.out.println("Student updated successfully.");
+                    else
+                        System.out.println("Update failed.");
+                    break;
+
+                case 4:
+                    System.out.print("StudentID to delete: "); int delId = sc.nextInt();
+                    if (controller.deleteStudent(delId))
+                        System.out.println("Student deleted successfully.");
+                    else
+                        System.out.println("Delete failed.");
+                    break;
+
+                case 5:
+                    System.out.println("Exiting..."); return;
+
+                default:
+                    System.out.println("Invalid choice.");
+            }
+        }
+    }
+}
