@@ -1,0 +1,19 @@
+import java.util.*;
+
+public class AutoboxingUnboxingExample {
+    public static void main(String[] args) {
+        Scanner sc = new Scanner(System.in);
+        ArrayList<Integer> numbers = new ArrayList<>();
+        System.out.println("Enter integers separated by space:");
+        String input = sc.nextLine();
+        String[] parts = input.split(" ");
+        for (String part : parts) {
+            numbers.add(Integer.parseInt(part));
+        }
+        int sum = 0;
+        for (Integer num : numbers) {
+            sum += num;
+        }
+        System.out.println("Sum: " + sum);
+    }
+}
