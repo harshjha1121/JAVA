@@ -1,0 +1,200 @@
+import org.hibernate.Session;
+import org.hibernate.SessionFactory;
+import org.hibernate.Transaction;
+import org.hibernate.cfg.Configuration;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.*;
+import org.springframework.stereotype.Repository;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.EnableTransactionManagement;
+import org.springframework.transaction.annotation.Transactional;
+import jakarta.persistence.*;
+import java.util.List;
+
+// ========================
+// ENTITY CLASSES
+// ========================
+
+@Entity
+@Table(name = "account")
+class Account {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private int id;
+
+    @Column(nullable = false)
+    private String holderName;
+
+    @Column(nullable = false)
+    private double balance;
+
+    public Account() {}
+    public Account(String holderName, double balance) {
+        this.holderName = holderName;
+        this.balance = balance;
+    }
+
+    public int getId() { return id; }
+    public String getHolderName() { return holderName; }
+    public double getBalance() { return balance; }
+
+    public void setBalance(double balance) { this.balance = balance; }
+
+    @Override
+    public String toString() {
+        return "Account [id=" + id + ", holderName=" + holderName + ", balance=" + balance + "]";
+    }
+}
+
+@Entity
+@Table(name = "transaction_history")
+class TransactionRecord {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private int id;
+
+    private int fromAccountId;
+    private int toAccountId;
+    private double amount;
+
+    public TransactionRecord() {}
+    public TransactionRecord(int fromAccountId, int toAccountId, double amount) {
+        this.fromAccountId = fromAccountId;
+        this.toAccountId = toAccountId;
+        this.amount = amount;
+    }
+}
+
+// ========================
+// DAO LAYER
+// ========================
+
+@Repository
+class AccountDAO {
+    @Autowired
+    private SessionFactory sessionFactory;
+
+    public Account getAccountById(int id) {
+        return sessionFactory.getCurrentSession().get(Account.class, id);
+    }
+
+    public void updateAccount(Account account) {
+        sessionFactory.getCurrentSession().merge(account);
+    }
+
+    public void saveTransaction(TransactionRecord record) {
+        sessionFactory.getCurrentSession().persist(record);
+    }
+
+    public List<Account> getAllAccounts() {
+        return sessionFactory.getCurrentSession().createQuery("from Account", Account.class).list();
+    }
+}
+
+// ========================
+// SERVICE LAYER
+// ========================
+
+@Service
+class BankingService {
+    @Autowired
+    private AccountDAO accountDAO;
+
+    @Transactional
+    public void transferMoney(int fromId, int toId, double amount) {
+        Account from = accountDAO.getAccountById(fromId);
+        Account to = accountDAO.getAccountById(toId);
+
+        if (from == null || to == null)
+            throw new RuntimeException("Account not found!");
+        if (from.getBalance() < amount)
+            throw new RuntimeException("Insufficient funds!");
+
+        from.setBalance(from.getBalance() - amount);
+        to.setBalance(to.getBalance() + amount);
+
+        accountDAO.updateAccount(from);
+        accountDAO.updateAccount(to);
+
+        // Save transaction record
+        accountDAO.saveTransaction(new TransactionRecord(fromId, toId, amount));
+
+        System.out.println("Transferred ₹" + amount + " from " + from.getHolderName() + " to " + to.getHolderName());
+    }
+
+    @Transactional(readOnly = true)
+    public void showAllAccounts() {
+        List<Account> list = accountDAO.getAllAccounts();
+        list.forEach(System.out::println);
+    }
+}
+
+// ========================
+// CONFIGURATION CLASS
+// ========================
+
+@Configuration
+@ComponentScan(basePackages = "com.example")
+@EnableTransactionManagement
+class AppConfig {
+
+    @Bean
+    public SessionFactory sessionFactory() {
+        Configuration cfg = new Configuration();
+        cfg.addAnnotatedClass(Account.class);
+        cfg.addAnnotatedClass(TransactionRecord.class);
+        cfg.setProperty("hibernate.connection.driver_class", "com.mysql.cj.jdbc.Driver");
+        cfg.setProperty("hibernate.connection.url", "jdbc:mysql://localhost:3306/bankdb");
+        cfg.setProperty("hibernate.connection.username", "root");
+        cfg.setProperty("hibernate.connection.password", "root");
+        cfg.setProperty("hibernate.dialect", "org.hibernate.dialect.MySQLDialect");
+        cfg.setProperty("hibernate.hbm2ddl.auto", "update");
+        cfg.setProperty("hibernate.show_sql", "true");
+        return cfg.buildSessionFactory();
+    }
+
+    @Bean
+    public org.springframework.orm.hibernate5.HibernateTransactionManager transactionManager(SessionFactory sf) {
+        return new org.springframework.orm.hibernate5.HibernateTransactionManager(sf);
+    }
+}
+
+// ========================
+// MAIN APP
+// ========================
+
+public class Main {
+    public static void main(String[] args) {
+        AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(AppConfig.class);
+        BankingService bankingService = context.getBean(BankingService.class);
+
+        SessionFactory sf = context.getBean(SessionFactory.class);
+        Session session = sf.openSession();
+        Transaction tx = session.beginTransaction();
+
+        // Initialize demo data if not present
+        if (session.createQuery("from Account", Account.class).list().isEmpty()) {
+            session.persist(new Account("Harsh", 5000));
+            session.persist(new Account("Riya", 3000));
+        }
+        tx.commit();
+        session.close();
+
+        System.out.println("\n--- Initial Accounts ---");
+        bankingService.showAllAccounts();
+
+        System.out.println("\n--- Performing Transfer ---");
+        try {
+            bankingService.transferMoney(1, 2, 1000);
+        } catch (Exception e) {
+            System.out.println("Transaction Failed: " + e.getMessage());
+        }
+
+        System.out.println("\n--- Updated Accounts ---");
+        bankingService.showAllAccounts();
+
+        context.close();
+    }
+}
