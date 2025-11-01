@@ -1,0 +1,64 @@
+import org.springframework.context.annotation.*;
+
+// --- Dependency Class ---
+class Course {
+    private String courseName;
+
+    public Course(String courseName) {
+        this.courseName = courseName;
+    }
+
+    public void showCourse() {
+        System.out.println("Enrolled in course: " + courseName);
+    }
+}
+
+// --- Dependent Class ---
+class Student {
+    private Course course; // dependency
+
+    // Constructor injection
+    public Student(Course course) {
+        this.course = course;
+    }
+
+    public void displayInfo() {
+        System.out.println("Student details:");
+        course.showCourse();
+    }
+}
+
+// --- Configuration Class ---
+@Configuration
+class AppConfig {
+
+    @Bean
+    public Course course() {
+        return new Course("Spring Framework with Java-based Configuration");
+    }
+
+    @Bean
+    public Student student() {
+        // Inject course() bean into student
+        return new Student(course());
+    }
+}
+
+// --- Main Class ---
+public class Main {
+    public static void main(String[] args) {
+
+        // Create Spring context using configuration class
+        AnnotationConfigApplicationContext context =
+                new AnnotationConfigApplicationContext(AppConfig.class);
+
+        // Retrieve the Student bean
+        Student student = context.getBean(Student.class);
+
+        // Demonstrate successful dependency injection
+        student.displayInfo();
+
+        // Close the context
+        context.close();
+    }
+}
